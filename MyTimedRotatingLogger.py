@@ -47,64 +47,59 @@ class MyRotatingFileHandler(TimedRotatingFileHandler):
 
             t = time.strftime(format, time.localtime(self.rolloverAt))
                 
-            return logfile.replace('log.log', 'log_{}.log'.format(t))
+            return logfile.replace('log', '_{}.log'.format(t))
 
         raise Exception('Log file must end in log.log')
 
-def createLogger(
-    name, 
-    log_file = None,
-    log_fmt = None,
-    file_log_level = None,
-    stream_fmt = None,
-    stream_level = None,
-    rotate_when='MIDNIGHT',
-    rotate_interval=1):
+def myLogger(
+        name, log_file=None, log_fmt=None, logfile_level=None, 
+        stream_fmt=None, stream=False, stream_level=None, when='MIDNIGHT', 
+        interval=10, propogate=True) -> logging.Logger:
     """    
     Create the different logger should you want a separate
     configuration for separate loggers. The log file handler 
-    is initiated using the file_log__level
-    Args:
-        name ([str]): name of the logger
-        log_file ([str]): log file name. File MUST end in log.log
-        log_fmt ([str]): log file formatter
-        file_log_level ([str]):   logging level for file handler.
-        stream_fmt ([string]): Assign a separate config for steam handler.
-        stream_level (str, optional): log level for streamhandler
-
-    Returns:
-        [logging.Logger]: logger sub class of the logger with timed file rotation
+    is initiated using the file_log__level.
     """
     if log_file == None and stream_level == None:
         raise('Logger must have a log file and/or stream level defined')
 
     logger = logging.getLogger(name)
-    default_formatter = logging.Formatter('%(asctime)s - %(levelname)s, %(message)s')
-
-
+    default_formatter = logging.Formatter(
+        '%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    
+    # Using the log_file file name as the indicator to set up the log to file
+    # We expect most usage around not defining a custom formatter so we
+    # check for the None first.
     if log_file:
-        fh = MyRotatingFileHandler(filename=log_file, when=rotate_when, interval=rotate_interval)
+        fh = MyRotatingFileHandler(
+            filename=log_file, when=when, interval=interval)
         if log_fmt == None:
             fh.setFormatter(default_formatter)
         else:
             file_log_formatter = logging.Formatter(log_fmt)
             fh.setFormatter(file_log_formatter)
         logger.addHandler(fh)
-         
-    if stream_level:
+    
+    if stream:
         sh = logging.StreamHandler()
-        sh.setLevel(getattr(logging, stream_level))
+        if stream_level:
+            sh.setLevel(getattr(logging, stream_level))
+        else:
+            if logfile_level == None:
+                sh.setLevel(logging.ERROR)
+            else:
+                sh.setLevel(getattr(logging, logfile_level))
         if stream_fmt:
             stream_formatter = logging.Formatter(stream_fmt)
             sh.setFormatter(stream_formatter)
         else:
-            stream_formatter = logging.Formatter(stream_fmt)
-            sh.setFormatter(stream_formatter)
+            sh.setFormatter(default_formatter)
         logger.addHandler(sh)
         
-    if file_log_level:
-        logger.setLevel(getattr(logging, file_log_level))
+    if logfile_level:
+        logger.setLevel(getattr(logging, logfile_level))
     else:
         logger.setLevel(logging.WARNING)
+    if propogate == False:
+        logger.propagate = False
     return logger
-    
